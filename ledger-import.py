@@ -1,7 +1,31 @@
 import csv, sys, re, collections
+from fuzzywuzzy import process
 
 def get_string_without_comment(str):
     return re.split("(?:  | *\t+);", str)[0]
+
+def get_accounts(desc, associated_accounts):
+    accounts = dict()
+    closest_match = process.extractOne(desc, associated_accounts.keys())
+    print("cloest previous match: ", closest_match)
+
+    # check for description in list of associated accounts
+    if desc in associated_accounts:
+        # start index at 1 for more user-friendliness
+        i = 1
+        top_accounts = associated_accounts[desc].most_common(9)
+        for acc in top_accounts:
+            print(i, ":", acc[0])
+            i += 1
+
+        selected_index = int(input("enter selection: "))
+        account_name = top_accounts[selected_index-1][0]
+    else:
+        print("Could not find a previous transaction with matching description.")
+        account_name = input("Enter account name: ")
+
+    accounts[account_name] = "";
+    return accounts
 
 def read_bank_transactions(this_account, associated_accounts):
     with open('test.csv', newline='') as csv_file:
@@ -49,22 +73,8 @@ def read_bank_transactions(this_account, associated_accounts):
             else:
                 accounts[this_account] = "$" + entry[credit_col]
 
-            # check for description in list of associated accounts
-            if entry[desc_col] in associated_accounts:
-                # start index at 1 for more user-friendliness
-                i = 1
-                top_accounts = associated_accounts[entry[desc_col]].most_common(9)
-                for acc in top_accounts:
-                    print(i, ":", acc[0])
-                    i += 1
-
-                selected_index = int(input("enter selection: "))
-                account_name = top_accounts[selected_index-1][0]
-            else:
-                print("Could not find a previous transaction with matching description.")
-                account_name = input("Enter account name: ")
-
-            accounts[account_name] = "";
+            x = get_accounts(entry[desc_col], associated_accounts)
+            accounts.update(x)
 
             transaction['accounts'] = accounts
             print(transaction)
