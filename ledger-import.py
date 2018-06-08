@@ -5,29 +5,47 @@ from account_completer import AccountCompleter
 def get_string_without_comment(str):
     return re.split("(?:  | *\t+);", str)[0]
 
+def get_account_from_user(completer):
+    """
+    Asks user for the name of an account, adding it to our list of accounts in
+    our auto completer.
+    """
+    account_name = input("Enter account name: ")
+    completer.add_account(account_name)
+    return account_name
+
+def get_match_selection(completer, closest_match, associated_accounts):
+    # start index at 1 for more user-friendliness
+    i = 1
+    top_accounts = associated_accounts[closest_match].most_common(9)
+    for acc in top_accounts:
+        print(i, ":", acc[0])
+        i += 1
+
+    print("0 : Other...")
+
+    # TODO: option to split across multiple accounts
+    selected_index = int(input("enter selection: "))
+
+    if selected_index == 0:
+        account_name = get_account_from_user(completer)
+    else:
+        account_name = top_accounts[selected_index-1][0]
+    return account_name
+
+
 def get_accounts(account_completer, desc, associated_accounts, match_threshold=75):
     accounts = dict()
     closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
     print("cloest previous match: ", closest_match)
 
     if match_score >= match_threshold:
-        # start index at 1 for more user-friendliness
-        i = 1
-        top_accounts = associated_accounts[closest_match].most_common(9)
-        for acc in top_accounts:
-            print(i, ":", acc[0])
-            i += 1
-
-        selected_index = int(input("enter selection: "))
-        account_name = top_accounts[selected_index-1][0]
+        account_name = get_match_selection(account_completer, closest_match, associated_accounts)
         associated_accounts[desc].update([account_name])
-        # TODO: option to split across multiple accounts
-        # TODO: option to select a different account
     else:
         print("Could not find a previous transaction that is a close match.")
-        account_name = input("Enter account name: ")
+        account_name = get_account_from_user(account_completer)
         associated_accounts[desc] = account_name
-        account_completer.add_account(account_name)
 
     accounts[account_name] = "";
     return accounts
