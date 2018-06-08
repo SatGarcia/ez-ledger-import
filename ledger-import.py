@@ -4,25 +4,26 @@ from fuzzywuzzy import process
 def get_string_without_comment(str):
     return re.split("(?:  | *\t+);", str)[0]
 
-def get_accounts(desc, associated_accounts):
+def get_accounts(desc, associated_accounts, match_threshold=75):
     accounts = dict()
-    closest_match = process.extractOne(desc, associated_accounts.keys())
+    closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
     print("cloest previous match: ", closest_match)
 
-    # check for description in list of associated accounts
-    if desc in associated_accounts:
+    if match_score >= match_threshold:
         # start index at 1 for more user-friendliness
         i = 1
-        top_accounts = associated_accounts[desc].most_common(9)
+        top_accounts = associated_accounts[closest_match].most_common(9)
         for acc in top_accounts:
             print(i, ":", acc[0])
             i += 1
 
         selected_index = int(input("enter selection: "))
         account_name = top_accounts[selected_index-1][0]
+        associated_accounts[desc].update([account_name])
     else:
-        print("Could not find a previous transaction with matching description.")
+        print("Could not find a previous transaction that is a close match.")
         account_name = input("Enter account name: ")
+        associated_accounts[desc] = account_name
 
     accounts[account_name] = "";
     return accounts
