@@ -5,7 +5,7 @@ from account_completer import AccountCompleter
 def get_string_without_comment(str):
     return re.split("(?:  | *\t+);", str)[0]
 
-def get_accounts(desc, associated_accounts, match_threshold=75):
+def get_accounts(account_completer, desc, associated_accounts, match_threshold=75):
     accounts = dict()
     closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
     print("cloest previous match: ", closest_match)
@@ -21,15 +21,18 @@ def get_accounts(desc, associated_accounts, match_threshold=75):
         selected_index = int(input("enter selection: "))
         account_name = top_accounts[selected_index-1][0]
         associated_accounts[desc].update([account_name])
+        # TODO: option to split across multiple accounts
+        # TODO: option to select a different account
     else:
         print("Could not find a previous transaction that is a close match.")
         account_name = input("Enter account name: ")
         associated_accounts[desc] = account_name
+        account_completer.add_account(account_name)
 
     accounts[account_name] = "";
     return accounts
 
-def read_bank_transactions(this_account, associated_accounts):
+def read_bank_transactions(account_completer, this_account, associated_accounts):
     with open('test.csv', newline='') as csv_file:
         csv_has_header = csv.Sniffer().has_header(csv_file.read(1024))
         csv_file.seek(0)
@@ -75,7 +78,7 @@ def read_bank_transactions(this_account, associated_accounts):
             else:
                 accounts[this_account] = "$" + entry[credit_col]
 
-            x = get_accounts(entry[desc_col], associated_accounts)
+            x = get_accounts(account_completer, entry[desc_col], associated_accounts)
             accounts.update(x)
 
             transaction['accounts'] = accounts
@@ -147,7 +150,7 @@ if __name__ == "__main__":
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
 
-    new_transactions = read_bank_transactions("Liabilities:CapitalOne", assoc_accounts)
+    new_transactions = read_bank_transactions(completer, "Liabilities:CapitalOne", assoc_accounts)
 
     for nt in new_transactions:
         print("\n")

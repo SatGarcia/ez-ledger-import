@@ -6,6 +6,11 @@ class AccountCompleter(object):  # Custom completer
         # TODO: add partials paths for each account
         self.accounts = sorted(accounts)
 
+    def add_account(self, new_account):
+        if not new_account in self.accounts:
+            self.accounts.append(new_account)
+            self.accounts = sorted(self.accounts)
+
     def complete(self, text, state):
         buffer = readline.get_line_buffer()
         if state == 0:  # on first trigger, build possible matches
