@@ -1,5 +1,6 @@
-import csv, sys, re, collections
+import csv, sys, re, collections, readline
 from fuzzywuzzy import process
+from account_completer import AccountCompleter
 
 def get_string_without_comment(str):
     return re.split("(?:  | *\t+);", str)[0]
@@ -84,6 +85,7 @@ def read_bank_transactions(this_account, associated_accounts):
         return transactions
 
 def read_ledger_entries(this_account):
+    all_accounts = set()
     associated_accounts = dict()
     with open('ledger-file.dat') as ledger_file:
         in_transaction = False
@@ -111,6 +113,7 @@ def read_ledger_entries(this_account):
                     sys.exit(1)
 
                 account = components[0]
+                all_accounts.add(account)
                 if account != this_account:
                     #print("account:", account)
                     associated_accounts[payee].update([account])
@@ -134,21 +137,27 @@ def read_ledger_entries(this_account):
 
                 in_transaction = True
 
-    return associated_accounts
+    return all_accounts, associated_accounts
 
+if __name__ == "__main__":
+    all_accounts, assoc_accounts = read_ledger_entries("Liabilities:CapitalOne")
 
-assoc_accounts = read_ledger_entries("Liabilities:CapitalOne")
-new_transactions = read_bank_transactions("Liabilities:CapitalOne", assoc_accounts)
+    completer = AccountCompleter(list(all_accounts))
+    #readline.set_completer_delims(':')
+    readline.set_completer(completer.complete)
+    readline.parse_and_bind('tab: complete')
 
-for nt in new_transactions:
-    print("\n")
-    for k,v in nt.items():
-        print(k, ":", v)
+    new_transactions = read_bank_transactions("Liabilities:CapitalOne", assoc_accounts)
 
-"""
-for k,v in assoc_accounts.items():
-    print("\npayee:", k)
-    print("accounts:")
-    for acc in v.most_common(9):
-        print("\t", acc[0])
-"""
+    for nt in new_transactions:
+        print("\n")
+        for k,v in nt.items():
+            print(k, ":", v)
+
+    """
+    for k,v in assoc_accounts.items():
+        print("\npayee:", k)
+        print("accounts:")
+        for acc in v.most_common(9):
+            print("\t", acc[0])
+    """
