@@ -7,7 +7,7 @@ class AccountCompleter(object):  # Custom completer
         self.accounts = sorted(accounts)
 
     def add_account(self, new_account):
-        if not new_account in self.accounts:
+        if new_account and not new_account in self.accounts:
             self.accounts.append(new_account)
             self.accounts = sorted(self.accounts)
 

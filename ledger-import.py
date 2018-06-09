@@ -11,10 +11,35 @@ def get_account_from_user(completer):
     our auto completer.
     """
     account_name = input("Enter account name: ")
-    completer.add_account(account_name)
-    return account_name
+    account_name = account_name.strip()
+    amount = ''
+
+    if account_name:
+        completer.add_account(account_name)
+        amount = input("Enter amount: ")
+        # TODO: verify amount is in correct format
+
+    return account_name, amount
+
+def handle_split(completer):
+    account_info = dict()
+    next_account, amount = get_account_from_user(completer)
+    while next_account:
+        # TODO: should we warn user here in case they messed it up?
+        if not next_account in account_info:
+            account_info[next_account] = amount
+        else:
+            account_info[next_account] += "+" + amount
+        next_account, amount = get_account_from_user(completer)
+
+    print(account_info)
+    return account_info
 
 def get_match_selection(completer, closest_match, associated_accounts):
+    """
+    Returns a dictionary mapping account names to the amount associated with
+    that account for this transaction.
+    """
     # start index at 1 for more user-friendliness
     i = 1
     top_accounts = associated_accounts[closest_match].most_common(9)
@@ -22,32 +47,39 @@ def get_match_selection(completer, closest_match, associated_accounts):
         print(i, ":", acc[0])
         i += 1
 
-    print("0 : Other...")
+    print("o : Other...")
+    print("s : Split...")
 
-    # TODO: option to split across multiple accounts
-    selected_index = int(input("enter selection: "))
-
-    if selected_index == 0:
-        account_name = get_account_from_user(completer)
+    selection = input("Enter selection: ")
+    if selection == 's':
+        account_info = handle_split(completer)
+    elif selection == 'o':
+        # TODO: should this just be handle_split?
+        account_info = dict()
+        account_name, amount = get_account_from_user(completer)
+        account_info[account_name] = amount
     else:
-        account_name = top_accounts[selected_index-1][0]
-    return account_name
+        account_info = dict()
+        selected_index = int(selection)
+        account_info[top_accounts[selected_index-1][0]] = ''
+
+    return account_info
 
 
 def get_accounts(account_completer, desc, associated_accounts, match_threshold=75):
-    accounts = dict()
     closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
     print("cloest previous match: ", closest_match)
 
     if match_score >= match_threshold:
-        account_name = get_match_selection(account_completer, closest_match, associated_accounts)
-        associated_accounts[desc].update([account_name])
+        accounts = get_match_selection(account_completer, closest_match, associated_accounts)
+        associated_accounts[desc].update(accounts.keys())
     else:
         print("Could not find a previous transaction that is a close match.")
-        account_name = get_account_from_user(account_completer)
+        accounts = dict()
+        account_name, amount = get_account_from_user(account_completer)
         associated_accounts[desc] = account_name
+        accounts[account_name] = amount;
 
-    accounts[account_name] = "";
     return accounts
 
 def read_bank_transactions(account_completer, this_account, associated_accounts):
@@ -60,12 +92,6 @@ def read_bank_transactions(account_completer, this_account, associated_accounts)
         for row in csv_reader:
             print(row)
             rows += [row]
-
-        """
-        print(rows)
-        for e in rows:
-            print(e)
-        """
 
         for i in range(len(rows[0])):
             print(i, ":", rows[0][i])
@@ -100,7 +126,7 @@ def read_bank_transactions(account_completer, this_account, associated_accounts)
             accounts.update(x)
 
             transaction['accounts'] = accounts
-            print(transaction)
+            #print(transaction)
             transactions.append(transaction)
 
         return transactions
@@ -160,6 +186,13 @@ def read_ledger_entries(this_account):
 
     return all_accounts, associated_accounts
 
+def get_printable_string(transaction):
+    s = transaction['date'] + " " + transaction['description'] + "\n";
+    for acc, amt in transaction['accounts'].items():
+        s += "\t" + acc + "\t\t" + amt + "\n"
+    return s
+
+
 if __name__ == "__main__":
     all_accounts, assoc_accounts = read_ledger_entries("Liabilities:CapitalOne")
 
@@ -171,14 +204,4 @@ if __name__ == "__main__":
     new_transactions = read_bank_transactions(completer, "Liabilities:CapitalOne", assoc_accounts)
 
     for nt in new_transactions:
-        print("\n")
-        for k,v in nt.items():
-            print(k, ":", v)
-
-    """
-    for k,v in assoc_accounts.items():
-        print("\npayee:", k)
-        print("accounts:")
-        for acc in v.most_common(9):
-            print("\t", acc[0])
-    """
+        print(get_printable_string(nt))
