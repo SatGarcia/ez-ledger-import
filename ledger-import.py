@@ -149,7 +149,7 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
                 print(" || ".join(entry[i] for i in [date_col, desc_col, debit_col, credit_col]))
 
             transaction = dict()
-            transaction['date'] = entry[date_col]
+            transaction['date'] = parse(entry[date_col]).strftime("%Y-%m-%d")
             transaction['description'] = entry[desc_col]
 
             # TODO: make sure there isn't a "$" in debit or credit column
