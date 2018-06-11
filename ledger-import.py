@@ -237,22 +237,38 @@ def get_printable_string(transaction):
     s = transaction['date'] + " " + transaction['description'] + "\n";
     for acc, amt in transaction['accounts'].items():
         s += "\t" + acc + "\t\t" + amt + "\n"
+
+    s += "\n"   # blank line after transaction, muiy importante
     return s
 
 
+def write_transactions_to_file(output_filename, transactions):
+    """
+    Writes given transactions out in ledger format to the specified output
+    file.
+    """
+    with open(output_filename, "a") as output_file:
+        for t in transactions:
+            output_file.write(get_printable_string(t))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: {script} ledger_file csv_file".format(script=sys.argv[0]))
+    if len(sys.argv) != 4:
+        print("Usage: {script} ledger_file csv_file output_file".format(script=sys.argv[0]))
         sys.exit(0)
 
-    all_accounts, assoc_accounts = read_ledger_entries(sys.argv[1], 'Liabilities:CapitalOne')
+    this_account = input("Enter the CSV file's account name: ")
+    all_accounts, assoc_accounts = read_ledger_entries(sys.argv[1],
+                                                       this_account)
 
     completer = AccountCompleter(list(all_accounts))
     readline.set_completer_delims(':')
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
 
-    new_transactions = read_bank_transactions(sys.argv[2], completer, 'Liabilities:CapitalOne', assoc_accounts)
+    new_transactions = read_bank_transactions(sys.argv[2], completer,
+                                              this_account, assoc_accounts)
 
-    for nt in new_transactions:
-        print(get_printable_string(nt))
+    # TODO: allow user to specify whether to append or to overwrite the output
+    # file
+    write_transactions_to_file(sys.argv[3], new_transactions)
