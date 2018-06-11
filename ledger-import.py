@@ -266,7 +266,10 @@ def write_transactions_to_file(output_filename, transactions):
     file.
     """
     with open(output_filename, "a") as output_file:
-        for t in transactions:
+        # sort transactions by date before writing them to file
+        sorted_transactions = sorted(transactions, key=lambda t: t['date'])
+
+        for t in sorted_transactions:
             output_file.write(get_printable_string(t))
 
 
