@@ -22,6 +22,10 @@ def get_account_from_user(completer):
     return account_name, amount
 
 def handle_split(completer):
+    """
+    Returns a dictionary mapping accounts with associated amount, as entered
+    by the user.
+    """
     account_info = dict()
     next_account, amount = get_account_from_user(completer)
     while next_account:
@@ -32,7 +36,7 @@ def handle_split(completer):
             account_info[next_account] += "+" + amount
         next_account, amount = get_account_from_user(completer)
 
-    print(account_info)
+    #print(account_info)
     return account_info
 
 def get_match_selection(completer, closest_match, associated_accounts):
@@ -47,17 +51,11 @@ def get_match_selection(completer, closest_match, associated_accounts):
         print(i, ":", acc[0])
         i += 1
 
-    print("o : Other...")
-    print("s : Split...")
+    print("o : Other / Split...")
 
     selection = input("Enter selection: ")
-    if selection == 's':
+    if selection == 'o':
         account_info = handle_split(completer)
-    elif selection == 'o':
-        # TODO: should this just be handle_split?
-        account_info = dict()
-        account_name, amount = get_account_from_user(completer)
-        account_info[account_name] = amount
     else:
         account_info = dict()
         selected_index = int(selection)
@@ -67,6 +65,13 @@ def get_match_selection(completer, closest_match, associated_accounts):
 
 
 def get_accounts(account_completer, desc, associated_accounts, match_threshold=75):
+    """
+    Returns dictionary that maps accounts to their associated amounts for the
+    transaction with the given description.
+    This also updates the list of associated accounts for desc, so we have a
+    history for improving future transactions with the same or similar
+    description.
+    """
     closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
     print("cloest previous match: ", closest_match)
 
@@ -75,14 +80,19 @@ def get_accounts(account_completer, desc, associated_accounts, match_threshold=7
         associated_accounts[desc].update(accounts.keys())
     else:
         print("Could not find a previous transaction that is a close match.")
-        accounts = dict()
-        account_name, amount = get_account_from_user(account_completer)
-        associated_accounts[desc] = account_name
-        accounts[account_name] = amount;
+        accounts = handle_split(account_completer)
+        associated_accounts[desc] = collections.Counter(accounts.keys())
 
     return accounts
 
 def read_bank_transactions(account_completer, this_account, associated_accounts):
+    """
+    Returns a list of transactions based on a given CSV file.
+    Each transaction will include the date, a description of the transaction
+    (i.e. the payee), and a dictionary mapping the accounts used by this
+    transaction and the amount of money associated with that account for this
+    transaction.
+    """
     with open('test.csv', newline='') as csv_file:
         csv_has_header = csv.Sniffer().has_header(csv_file.read(1024))
         csv_file.seek(0)
@@ -132,6 +142,12 @@ def read_bank_transactions(account_completer, this_account, associated_accounts)
         return transactions
 
 def read_ledger_entries(this_account):
+    """
+    Reads an existing ledger file and returns a list of all accounts used in
+    this ledger file and a mapping between every transaction description (i.e.
+    payee) and a counter of the frequency with which accounts were used in
+    transactions with the same or similar description.
+    """
     all_accounts = set()
     associated_accounts = dict()
     with open('ledger-file.dat') as ledger_file:
@@ -187,6 +203,9 @@ def read_ledger_entries(this_account):
     return all_accounts, associated_accounts
 
 def get_printable_string(transaction):
+    """
+    Returns a "Ledger-style" string representation of the tranaction.
+    """
     s = transaction['date'] + " " + transaction['description'] + "\n";
     for acc, amt in transaction['accounts'].items():
         s += "\t" + acc + "\t\t" + amt + "\n"
@@ -197,7 +216,7 @@ if __name__ == "__main__":
     all_accounts, assoc_accounts = read_ledger_entries("Liabilities:CapitalOne")
 
     completer = AccountCompleter(list(all_accounts))
-    #readline.set_completer_delims(':')
+    readline.set_completer_delims(':')
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
 
