@@ -57,14 +57,19 @@ def handle_split(completer):
     #print(account_info)
     return account_info
 
-def get_match_selection(completer, closest_match, associated_accounts):
+def get_match_selection(completer, matches, associated_accounts):
     """
     Returns a dictionary mapping account names to the amount associated with
     that account for this transaction.
     """
+    frequencies = collections.Counter()
+    for m in matches:
+        frequencies += associated_accounts[m]
+
+    top_accounts = frequencies.most_common(9)
+
     # start index at 1 for more user-friendliness
     i = 1
-    top_accounts = associated_accounts[closest_match].most_common(9)
     for acc in top_accounts:
         print(i, ":", acc[0])
         i += 1
@@ -91,11 +96,12 @@ def get_accounts(account_completer, desc, associated_accounts, match_threshold=7
     description.
     """
     desc = re.sub('PAYPAL \*|SQ \*', '', desc)
-    closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
+    close_matches = [name for name, score in process.extract(desc,
+                                                             associated_accounts.keys())
+                     if score >= match_threshold]
 
-    if match_score >= match_threshold:
-        print("closest previous match: ", closest_match, match_score, "%")
-        accounts = get_match_selection(account_completer, closest_match, associated_accounts)
+    if close_matches:
+        accounts = get_match_selection(account_completer, close_matches, associated_accounts)
         if desc in associated_accounts:
             associated_accounts[desc].update(accounts.keys())
         else:
