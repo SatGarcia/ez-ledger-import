@@ -1,11 +1,12 @@
 import csv, sys, re, collections, readline
 from fuzzywuzzy import process
 from account_completer import AccountCompleter
+from dateutil.parser import parse
 
 def get_string_without_comment(str):
     return re.split("(?:  | *\t+);", str)[0]
 
-def get_account_from_user(completer):
+def get_account_from_user(completer, tax_amount = "1.0775"):
     """
     Asks user for the name of an account, adding it to our list of accounts in
     our auto completer.
@@ -16,8 +17,25 @@ def get_account_from_user(completer):
 
     if account_name:
         completer.add_account(account_name)
-        amount = input("Enter amount: ")
-        # TODO: verify amount is in correct format
+        while True:
+            # TODO: print out message about space separated multiple amounts
+            # and * for tax-free
+            individual_amounts = input("Enter amount: ")
+            individual_amounts = individual_amounts.strip()
+
+            # If they entered something, make sure it is of the right format and
+            # parse it into ledger format
+            if re.fullmatch("((?:^|\s+)\d+(?:\.\d\d)?\*?)*", individual_amounts):
+                if individual_amounts:
+                    raw_amounts = individual_amounts.split()
+                    # "*" after amount indicates it is untaxed
+                    taxed_amounts = ['$' + ra + '*' + tax_amount for ra in raw_amounts if ra[-1] != '*']
+                    untaxed_amounts = ['$' + ra[:-1] for ra in raw_amounts if ra[-1] == '*']
+                    amount = '(' + ' + '.join(taxed_amounts + untaxed_amounts) + ')'
+                break
+            elif individual_amounts:
+                print("Invalid amount format.")
+
 
     return account_name, amount
 
