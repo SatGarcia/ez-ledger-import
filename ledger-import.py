@@ -85,7 +85,7 @@ def get_accounts(account_completer, desc, associated_accounts, match_threshold=7
 
     return accounts
 
-def read_bank_transactions(account_completer, this_account, associated_accounts):
+def read_bank_transactions(csv_filename, account_completer, this_account, associated_accounts):
     """
     Returns a list of transactions based on a given CSV file.
     Each transaction will include the date, a description of the transaction
@@ -93,7 +93,7 @@ def read_bank_transactions(account_completer, this_account, associated_accounts)
     transaction and the amount of money associated with that account for this
     transaction.
     """
-    with open('test.csv', newline='') as csv_file:
+    with open(csv_filename, newline='') as csv_file:
         csv_has_header = csv.Sniffer().has_header(csv_file.read(1024))
         csv_file.seek(0)
 
@@ -141,7 +141,7 @@ def read_bank_transactions(account_completer, this_account, associated_accounts)
 
         return transactions
 
-def read_ledger_entries(this_account):
+def read_ledger_entries(ledger_filename, this_account):
     """
     Reads an existing ledger file and returns a list of all accounts used in
     this ledger file and a mapping between every transaction description (i.e.
@@ -150,7 +150,7 @@ def read_ledger_entries(this_account):
     """
     all_accounts = set()
     associated_accounts = dict()
-    with open('ledger-file.dat') as ledger_file:
+    with open(ledger_filename) as ledger_file:
         in_transaction = False
         payee = ""
 
@@ -213,14 +213,18 @@ def get_printable_string(transaction):
 
 
 if __name__ == "__main__":
-    all_accounts, assoc_accounts = read_ledger_entries("Liabilities:CapitalOne")
+    if len(sys.argv) != 3:
+        print("Usage: {script} ledger_file csv_file".format(script=sys.argv[0]))
+        sys.exit(0)
+
+    all_accounts, assoc_accounts = read_ledger_entries(sys.argv[1], 'Liabilities:CapitalOne')
 
     completer = AccountCompleter(list(all_accounts))
     readline.set_completer_delims(':')
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
 
-    new_transactions = read_bank_transactions(completer, "Liabilities:CapitalOne", assoc_accounts)
+    new_transactions = read_bank_transactions(sys.argv[2], completer, 'Liabilities:CapitalOne', assoc_accounts)
 
     for nt in new_transactions:
         print(get_printable_string(nt))
