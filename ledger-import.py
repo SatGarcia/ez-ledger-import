@@ -72,12 +72,16 @@ def get_accounts(account_completer, desc, associated_accounts, match_threshold=7
     history for improving future transactions with the same or similar
     description.
     """
+    desc = re.sub('PAYPAL \*|SQ \*', '', desc)
     closest_match, match_score = process.extractOne(desc, associated_accounts.keys())
-    print("cloest previous match: ", closest_match)
 
     if match_score >= match_threshold:
+        print("closest previous match: ", closest_match, match_score, "%")
         accounts = get_match_selection(account_completer, closest_match, associated_accounts)
-        associated_accounts[desc].update(accounts.keys())
+        if desc in associated_accounts:
+            associated_accounts[desc].update(accounts.keys())
+        else:
+            associated_accounts[desc] = collections.Counter(accounts.keys())
     else:
         print("Could not find a previous transaction that is a close match.")
         accounts = handle_split(account_completer)
@@ -111,7 +115,7 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
         debit_col = int(input("Which entry contains the debit amount? "))
         credit_col = int(input("Which entry contains the credit amount? "))
 
-        # TODO: handle when debit and credit are a single column with +/-
+        combined_debit_credit = debit_col == credit_col
 
         if csv_has_header:
             start_index = 1
@@ -120,17 +124,41 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
 
         transactions = []
         for entry in rows[start_index:]:
-            print(" ".join(entry[i] for i in [date_col, desc_col, debit_col, credit_col]))
+            print()
+            if combined_debit_credit:
+                print(" || ".join(entry[i] for i in [date_col, desc_col, debit_col]))
+            else:
+                print(" || ".join(entry[i] for i in [date_col, desc_col, debit_col, credit_col]))
+
             transaction = dict()
             transaction['date'] = entry[date_col]
             transaction['description'] = entry[desc_col]
 
+            # TODO: make sure there isn't a "$" in debit or credit column
+
             accounts = dict()
-            # TODO make sure don't have both debit and credit 
-            if entry[debit_col]:
-                accounts[this_account] = "$-" + entry[debit_col]
+
+            if not combined_debit_credit and entry[debit_col] and entry[credit_col]:
+                raise RuntimeError("Entry has both debit and credit")
+
+            this_account_amount = "$"
+            if combined_debit_credit:
+                if entry[debit_col][0] == "-":
+                    # "-" with combined debit/credit implies credit, i.e.
+                    # positive amount for this_account
+                    this_account_amount += entry[debit_col][1:]
+                else:
+                    # lack of "-" for combined debit/credit implies debit,
+                    # i.e.  negative amount from this_account
+                    this_account_amount += "-" + entry[debit_col]
+            elif entry[debit_col]:
+                if entry[debit_col][0] != "-":
+                    this_account_amount += "-"
+                this_account_amount += entry[debit_col]
             else:
-                accounts[this_account] = "$" + entry[credit_col]
+                this_account_amount += entry[credit_col]
+
+            accounts[this_account] = this_account_amount
 
             x = get_accounts(account_completer, entry[desc_col], associated_accounts)
             accounts.update(x)
