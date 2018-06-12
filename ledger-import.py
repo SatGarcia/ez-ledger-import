@@ -76,13 +76,21 @@ def get_match_selection(completer, matches, associated_accounts):
 
     print("o : Other / Split...")
 
-    selection = input("Enter selection: ")
-    if selection == 'o':
-        account_info = handle_split(completer)
-    else:
-        account_info = dict()
-        selected_index = int(selection)
-        account_info[top_accounts[selected_index-1][0]] = ''
+    while True:
+        selection = input("\nEnter selection: ")
+        if re.fullmatch("\d+", selection):
+            account_info = dict()
+            selected_index = int(selection)
+            if selected_index > 0 and selected_index <= len(top_accounts):
+                account_info[top_accounts[selected_index-1][0]] = ''
+                break
+            else:
+                print("Invalid selection!")
+        elif selection == 'o':
+            account_info = handle_split(completer)
+            break
+        else:
+            print("Invalid selection!")
 
     return account_info
 
