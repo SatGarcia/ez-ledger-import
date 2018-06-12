@@ -4,7 +4,7 @@ from account_completer import AccountCompleter
 from dateutil.parser import parse
 
 def get_string_without_comment(str):
-    return re.split("(?:  | *\t+);", str)[0]
+    return re.split("(?:  +| *\t+);", str)[0]
 
 def get_account_from_user(completer, tax_amount = "1.0775"):
     """
