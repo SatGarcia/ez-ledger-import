@@ -154,8 +154,11 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
         else:
             start_index = 0
 
+        sorted_rows = sorted(rows[start_index:],
+                             key=lambda r: parse(r[date_col]))
+
         transactions = []
-        for entry in rows[start_index:]:
+        for entry in sorted_rows:
             print()
             if combined_debit_credit:
                 print(" || ".join(entry[i] for i in [date_col, desc_col, debit_col]))
