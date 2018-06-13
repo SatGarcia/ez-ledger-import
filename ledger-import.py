@@ -95,7 +95,7 @@ def get_match_selection(completer, matches, associated_accounts):
     return account_info
 
 
-def get_accounts(account_completer, desc, associated_accounts, match_threshold=75):
+def get_accounts(account_completer, desc, associated_accounts, match_threshold=90):
     """
     Returns dictionary that maps accounts to their associated amounts for the
     transaction with the given description.
