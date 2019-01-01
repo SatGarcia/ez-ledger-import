@@ -1,4 +1,5 @@
-import csv, sys, re, collections, readline
+import csv, sys, re, collections, readline, argparse
+
 from fuzzywuzzy import process
 from account_completer import AccountCompleter
 from dateutil.parser import parse
@@ -291,11 +292,18 @@ def write_transactions_to_file(output_filename, transactions):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("Usage: {script} ledger_file csv_file output_file".format(script=sys.argv[0]))
-        sys.exit(0)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("training_data", help="Ledger file used for learning.")
+    parser.add_argument("csv_file", help="CSV file financial transactions.")
+    parser.add_argument("output", help="File to which new entries are written.")
+    parser.add_argument("--account", help="Account associated with transactions.")
+    args = parser.parse_args()
 
-    this_account = input("Enter the CSV file's account name: ")
+    if args.account:
+        this_account = args.account
+    else:
+        this_account = input("Enter the CSV file's account name: ")
+
     all_accounts, assoc_accounts = read_ledger_entries(sys.argv[1],
                                                        this_account)
 
