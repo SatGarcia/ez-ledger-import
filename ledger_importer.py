@@ -19,9 +19,7 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
     if account_name:
         completer.add_account(account_name)
         while True:
-            # TODO: print out message about space separated multiple amounts
-            # and * for tax-free
-            individual_amounts = input("Enter amount: ")
+            individual_amounts = input("Enter space-separated amounts. Append '*' to untaxed amounts: ")
             individual_amounts = individual_amounts.strip()
 
             # If they entered something, make sure it is of the right format and
@@ -35,7 +33,7 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
                     amount = '(' + ' + '.join(taxed_amounts + untaxed_amounts) + ')'
                 break
             elif individual_amounts:
-                print("Invalid amount format.")
+                print("Invalid format.")
 
 
     return account_name, amount
