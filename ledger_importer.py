@@ -304,7 +304,7 @@ if __name__ == "__main__":
     else:
         this_account = input("Enter the CSV file's account name: ")
 
-    all_accounts, assoc_accounts = read_ledger_entries(sys.argv[1],
+    all_accounts, assoc_accounts = read_ledger_entries(args.training_data,
                                                        this_account)
 
     completer = AccountCompleter(list(all_accounts))
@@ -312,9 +312,9 @@ if __name__ == "__main__":
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
 
-    new_transactions = read_bank_transactions(sys.argv[2], completer,
+    new_transactions = read_bank_transactions(args.csv_file, completer,
                                               this_account, assoc_accounts)
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
-    write_transactions_to_file(sys.argv[3], new_transactions)
+    write_transactions_to_file(args.output, new_transactions)
