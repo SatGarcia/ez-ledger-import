@@ -77,7 +77,7 @@ def get_match_selection(completer, matches, associated_accounts):
 
     while True:
         selection = input("\nEnter selection: ")
-        if re.fullmatch("\d+", selection):
+        if selection.isdigit():
             account_info = dict()
             selected_index = int(selection)
             if selected_index > 0 and selected_index <= len(top_accounts):
