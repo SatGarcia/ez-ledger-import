@@ -199,7 +199,9 @@ def create_transaction(csv_entry, columns, account_completer,
 
     return transaction
 
-def read_bank_transactions(csv_filename, account_completer, this_account, associated_accounts):
+def read_bank_transactions(csv_filename, account_completer, this_account,
+                           associated_accounts, start_date=None,
+                           end_date=None):
     """
     Returns a list of transactions based on a given CSV file.
     Each transaction will include the date, a description of the transaction
@@ -209,6 +211,11 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
     """
     with open(csv_filename, newline='') as csv_file:
         csv_has_header = csv.Sniffer().has_header(csv_file.read(1024))
+        if csv_has_header:
+            start_index = 1
+        else:
+            start_index = 0
+
         csv_file.seek(0)
 
         csv_reader = csv.reader(csv_file)
@@ -227,17 +234,20 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
         columns['credit'] = int(input("Which entry contains the credit amount? "))
 
 
-        if csv_has_header:
-            start_index = 1
-        else:
-            start_index = 0
 
         sorted_rows = sorted(rows[start_index:],
                              key=lambda r: parse(r[columns['date']]))
 
+        if start_date is None:
+            start_date = parse("1900-01-01")
+        if end_date is None:
+            end_date = parse("3005-12-31")  # childish
+
+        filtered_rows = filter(lambda r: start_date <= parse(r[columns['date']]) <= end_date, sorted_rows)
+
         transactions = []
         snoozed_entries = []
-        for entry in sorted_rows:
+        for entry in filtered_rows:
             t = create_transaction(entry, columns, account_completer,
                                    associated_accounts)
             if t is not None:
@@ -350,6 +360,10 @@ if __name__ == "__main__":
     parser.add_argument("csv_file", help="CSV file financial transactions.")
     parser.add_argument("output", help="File to which new entries are written.")
     parser.add_argument("--account", help="Account associated with transactions.")
+    parser.add_argument("--startdate", type=parse,
+                        help="All entries BEFORE this datw will be ignored")
+    parser.add_argument("--enddate", type=parse,
+                        help="All entries AFTER this datw will be ignored")
     args = parser.parse_args()
 
     if args.account:
@@ -366,7 +380,9 @@ if __name__ == "__main__":
     readline.parse_and_bind('tab: complete')
 
     new_transactions = read_bank_transactions(args.csv_file, completer,
-                                              this_account, assoc_accounts)
+                                              this_account, assoc_accounts,
+                                              start_date=args.startdate,
+                                              end_date=args.enddate)
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
