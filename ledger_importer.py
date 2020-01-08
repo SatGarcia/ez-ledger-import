@@ -74,6 +74,7 @@ def get_match_selection(completer, matches, associated_accounts):
         i += 1
 
     print("o : Other / Split...")
+    print("s : Snooze")
 
     while True:
         selection = input("\nEnter selection: ")
@@ -87,6 +88,9 @@ def get_match_selection(completer, matches, associated_accounts):
                 print("Invalid selection!")
         elif selection == 'o':
             account_info = handle_split(completer)
+            break
+        elif selection == 's':
+            account_info = None
             break
         else:
             print("Invalid selection!")
@@ -109,16 +113,91 @@ def get_accounts(account_completer, desc, associated_accounts, match_threshold=9
 
     if close_matches:
         accounts = get_match_selection(account_completer, close_matches, associated_accounts)
-        if desc in associated_accounts:
-            associated_accounts[desc].update(accounts.keys())
-        else:
-            associated_accounts[desc] = collections.Counter(accounts.keys())
+        if accounts is not None:
+            if desc in associated_accounts:
+                associated_accounts[desc].update(accounts.keys())
+            else:
+                associated_accounts[desc] = collections.Counter(accounts.keys())
     else:
         print("Could not find a previous transaction that is a close match.")
-        accounts = handle_split(account_completer)
-        associated_accounts[desc] = collections.Counter(accounts.keys())
+        print("o : Other / Split...")
+        print("s : Snooze")
+
+        valid_selection = False
+
+        while True:
+            selection = input("\nEnter selection: ")
+            if selection == 'o':
+                accounts = handle_split(account_completer)
+                associated_accounts[desc] = collections.Counter(accounts.keys())
+                break
+            elif selection == 's':
+                return None
+            else:
+                print("Invalid selection!")
 
     return accounts
+
+def create_transaction(csv_entry, columns, account_completer,
+                       associated_accounts):
+    """ Create a transaction based on the given CSV file entry. """
+
+    print()
+
+    combined_debit_credit = columns['debit'] == columns['credit']
+
+    if combined_debit_credit:
+        print(" || ".join(csv_entry[i] for i in [columns['date'],
+                                                 columns['desc'],
+                                                 columns['debit']]))
+    else:
+        print(" || ".join(csv_entry[i] for i in [columns['date'],
+                                                 columns['desc'],
+                                                 columns['debit'],
+                                                 columns['credit']]))
+
+    transaction = dict()
+    transaction['date'] = parse(csv_entry[columns['date']]).strftime("%Y-%m-%d")
+    transaction['description'] = csv_entry[columns['desc']]
+
+    # TODO: make sure there isn't a "$" in debit or credit column
+
+    accounts = dict()
+    x = get_accounts(account_completer, csv_entry[columns['desc']], associated_accounts)
+
+    if x is None:
+        """ User chose to 'snooze' processing this entry so there is no
+        transaction to return now. """
+        return None
+    else:
+        accounts.update(x)
+
+
+    if not combined_debit_credit and csv_entry[columns['debit']] and csv_entry[columns['credit']]:
+        raise RuntimeError("Entry has both debit and credit")
+
+    this_account_amount = "$"
+    if combined_debit_credit:
+        if csv_entry[columns['debit']][0] == "-":
+            # "-" with combined debit/credit implies credit, i.e.
+            # positive amount for this_account
+            this_account_amount += csv_entry[columns['debit']][1:]
+        else:
+            # lack of "-" for combined debit/credit implies debit,
+            # i.e.  negative amount from this_account
+            this_account_amount += "-" + csv_entry[columns['debit']]
+    elif csv_entry[columns['debit']]:
+        if csv_entry[columns['debit']][0] != "-":
+            this_account_amount += "-"
+        this_account_amount += csv_entry[columns['debit']]
+    else:
+        this_account_amount += csv_entry[columns['credit']]
+
+    accounts[this_account] = this_account_amount
+
+    transaction['accounts'] = accounts
+
+    return transaction
 
 def read_bank_transactions(csv_filename, account_completer, this_account, associated_accounts):
     """
@@ -141,12 +220,12 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
         for i in range(len(rows[0])):
             print(i, ":", rows[0][i])
 
-        date_col = int(input("Which entry contains the transaction date? "))
-        desc_col = int(input("Which entry contains the description? "))
-        debit_col = int(input("Which entry contains the debit amount? "))
-        credit_col = int(input("Which entry contains the credit amount? "))
+        columns = {}
+        columns['date'] = int(input("Which entry contains the transaction date? "))
+        columns['desc'] = int(input("Which entry contains the description? "))
+        columns['debit'] = int(input("Which entry contains the debit amount? "))
+        columns['credit'] = int(input("Which entry contains the credit amount? "))
 
-        combined_debit_credit = debit_col == credit_col
 
         if csv_has_header:
             start_index = 1
@@ -154,52 +233,28 @@ def read_bank_transactions(csv_filename, account_completer, this_account, associ
             start_index = 0
 
         sorted_rows = sorted(rows[start_index:],
-                             key=lambda r: parse(r[date_col]))
+                             key=lambda r: parse(r[columns['date']]))
 
         transactions = []
+        snoozed_entries = []
         for entry in sorted_rows:
-            print()
-            if combined_debit_credit:
-                print(" || ".join(entry[i] for i in [date_col, desc_col, debit_col]))
+            t = create_transaction(entry, columns, account_completer,
+                                   associated_accounts)
+            if t is not None:
+                transactions.append(t)
             else:
-                print(" || ".join(entry[i] for i in [date_col, desc_col, debit_col, credit_col]))
+                snoozed_entries.append(entry)
 
-            transaction = dict()
-            transaction['date'] = parse(entry[date_col]).strftime("%Y-%m-%d")
-            transaction['description'] = entry[desc_col]
-
-            # TODO: make sure there isn't a "$" in debit or credit column
-
-            accounts = dict()
-
-            if not combined_debit_credit and entry[debit_col] and entry[credit_col]:
-                raise RuntimeError("Entry has both debit and credit")
-
-            this_account_amount = "$"
-            if combined_debit_credit:
-                if entry[debit_col][0] == "-":
-                    # "-" with combined debit/credit implies credit, i.e.
-                    # positive amount for this_account
-                    this_account_amount += entry[debit_col][1:]
-                else:
-                    # lack of "-" for combined debit/credit implies debit,
-                    # i.e.  negative amount from this_account
-                    this_account_amount += "-" + entry[debit_col]
-            elif entry[debit_col]:
-                if entry[debit_col][0] != "-":
-                    this_account_amount += "-"
-                this_account_amount += entry[debit_col]
+        while snoozed_entries:
+            """ Keep looping through snoozed entries while there are any. """
+            t = create_transaction(snoozed_entries[0], columns, account_completer,
+                                   associated_accounts)
+            if t is not None:
+                transactions.append(t)
             else:
-                this_account_amount += entry[credit_col]
+                snoozed_entries.append(snoozed_entries[0])
 
-            accounts[this_account] = this_account_amount
-
-            x = get_accounts(account_completer, entry[desc_col], associated_accounts)
-            accounts.update(x)
-
-            transaction['accounts'] = accounts
-            #print(transaction)
-            transactions.append(transaction)
+            del snoozed_entries[0]
 
         return transactions
 
