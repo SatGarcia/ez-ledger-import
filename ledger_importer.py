@@ -15,12 +15,19 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
     account_name = input("Enter account name: ")
     account_name = account_name.strip()
     amount = ''
+    comments = ''
 
     if account_name:
         completer.add_account(account_name)
         while True:
-            individual_amounts = input("Enter space-separated amounts. Append '*' to untaxed amounts: ")
-            individual_amounts = individual_amounts.strip()
+            user_input = input("Enter space-separated amounts. Append '*' to untaxed amounts: ")
+            #individual_amounts = user_input.strip()
+
+            # separate comment from the amounts (if one was given)
+            split_input = [s.strip() for s in user_input.split(';')]
+            individual_amounts = split_input[0]
+            if len(split_input) > 1:
+                comments = (';'.join(split_input[1:]))
 
             # If they entered something, make sure it is of the right format and
             # parse it into ledger format
@@ -36,7 +43,7 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
                 print("Invalid format.")
 
 
-    return account_name, amount
+    return account_name, amount, comments
 
 def handle_split(completer):
     """
@@ -44,14 +51,18 @@ def handle_split(completer):
     by the user.
     """
     account_info = dict()
-    next_account, amount = get_account_from_user(completer)
+    next_account, amount, comments = get_account_from_user(completer)
     while next_account:
         # TODO: should we warn user here in case they messed it up?
         if not next_account in account_info:
-            account_info[next_account] = amount
+            account_info[next_account] = (amount, comments)
         else:
-            account_info[next_account] += "+" + amount
-        next_account, amount = get_account_from_user(completer)
+            # if account was already used, add new info to the old
+            old_amount, old_comments = account_info[next_account]
+            account_info[next_account] = ("(" + old_amount + "+" + amount + ")",
+                                          old_comments + " ; " + comments)
+
+        next_account, amount, comments = get_account_from_user(completer)
 
     #print(account_info)
     return account_info
@@ -79,10 +90,12 @@ def get_match_selection(completer, matches, associated_accounts):
     while True:
         selection = input("\nEnter selection: ")
         if selection.isdigit():
+            # use blank ammount (which will auto-balance) and comment for
+            # pre-selection
             account_info = dict()
             selected_index = int(selection)
             if selected_index > 0 and selected_index <= len(top_accounts):
-                account_info[top_accounts[selected_index-1][0]] = ''
+                account_info[top_accounts[selected_index-1][0]] = ('', '')
                 break
             else:
                 print("Invalid selection!")
@@ -193,7 +206,7 @@ def create_transaction(csv_entry, columns, account_completer,
     else:
         this_account_amount += csv_entry[columns['credit']]
 
-    accounts[this_account] = this_account_amount
+    accounts[this_account] = (this_account_amount, '')
 
     transaction['accounts'] = accounts
 
@@ -334,10 +347,14 @@ def get_printable_string(transaction):
     Returns a "Ledger-style" string representation of the tranaction.
     """
     s = transaction['date'] + " " + transaction['description'] + "\n";
-    for acc, amt in transaction['accounts'].items():
-        s += "\t" + acc + "\t\t" + amt + "\n"
+    for acc, (amt, comm) in transaction['accounts'].items():
+        s += "\t" + acc + "\t\t" + amt
+        if comm:
+            # add comment(s) if there are any
+            s += "\t; " + comm
+        s += "\n"
 
-    s += "\n"   # blank line after transaction, muiy importante
+    s += "\n"   # blank line after transaction, muy importante
     return s
 
 
