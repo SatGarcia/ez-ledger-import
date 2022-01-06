@@ -40,9 +40,13 @@ if __name__ == "__main__":
         ]
 
     completer = AccountCompleter(list(set(accounts)))
-    #readline.set_completer_delims(':')
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
+    readline.set_completer_delims(':')
+
+    # hack for macOS?
+    readline.parse_and_bind("bind -e")
+    readline.parse_and_bind("bind '\t' rl_complete")
 
     print('Enter an account name:\n\t')
     account = input("> ")

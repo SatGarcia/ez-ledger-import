@@ -206,7 +206,7 @@ def create_transaction(csv_entry, columns, account_completer,
     else:
         this_account_amount += csv_entry[columns['credit']]
 
-    accounts[this_account] = (this_account_amount, '')
+    accounts[this_account] = (this_account_amount, '') # empty string is for blank transation comment
 
     transaction['accounts'] = accounts
 
@@ -395,6 +395,10 @@ if __name__ == "__main__":
     readline.set_completer_delims(':')
     readline.set_completer(completer.complete)
     readline.parse_and_bind('tab: complete')
+
+    # hack for macOS?
+    readline.parse_and_bind("bind -e")
+    readline.parse_and_bind("bind '\t' rl_complete")
 
     new_transactions = read_bank_transactions(args.csv_file, completer,
                                               this_account, assoc_accounts,
