@@ -1,5 +1,6 @@
 import csv, sys, re, collections, readline, argparse
 
+from tinydb import TinyDB
 from fuzzywuzzy import process
 from account_completer import AccountCompleter
 from dateutil.parser import parse
@@ -212,6 +213,67 @@ def create_transaction(csv_entry, columns, account_completer,
 
     return transaction
 
+def import_transactions(csv_filename, this_account):
+    """
+    Imports data from CSV file into database table.
+    """
+    with open(csv_filename, newline='') as csv_file:
+        csv_has_header = csv.Sniffer().has_header(csv_file.read(1024))
+        assert csv_has_header, "No header line found in CSV"
+        csv_file.seek(0)
+
+        csv_reader = csv.reader(csv_file)
+        header = next(csv_reader, None)
+
+        for i in range(len(header)):
+            print(i, ":", header[i])
+
+        columns = {}
+        columns['date'] = int(input("Which entry contains the transaction date? "))
+        columns['desc'] = int(input("Which entry contains the description? "))
+        columns['debit'] = int(input("Which entry contains the debit amount? "))
+        columns['credit'] = int(input("Which entry contains the credit amount? "))
+
+        combined_debit_credit = columns['debit'] == columns['credit']
+
+        target_db = TinyDB('imported.json')
+        target_db.truncate() # FIXME: remove this for final version
+
+        #source_db = TinyDB('converted.json')
+
+        for row in csv_reader:
+            print(row)
+
+            if combined_debit_credit:
+                print(" || ".join(row[i] for i in [columns['date'],
+                                                         columns['desc'],
+                                                         columns['debit']]))
+            else:
+                print(" || ".join(row[i] for i in [columns['date'],
+                                                         columns['desc'],
+                                                         columns['debit'],
+                                                         columns['credit']]))
+
+            transaction = dict()
+            transaction['account'] = this_account
+            transaction['date'] = parse(row[columns['date']]).strftime("%Y-%m-%d")
+
+            description = row[columns['desc']]
+            transaction['description'] = description
+
+            close_matches = [name for name, score in process.extract(description,
+                                                                     associated_accounts.keys())
+                             if score >= match_threshold]
+
+            payee = input("Enter Payee Name: ")
+            transaction['payee'] = payee
+            #print(transaction)
+            target_db.insert(transaction)
+
+        for row in target_db:
+            print(row)
+
+
 def read_bank_transactions(csv_filename, account_completer, this_account,
                            associated_accounts, start_date=None,
                            end_date=None):
@@ -400,11 +462,22 @@ if __name__ == "__main__":
     readline.parse_and_bind("bind -e")
     readline.parse_and_bind("bind '\t' rl_complete")
 
+    """
     new_transactions = read_bank_transactions(args.csv_file, completer,
                                               this_account, assoc_accounts,
                                               start_date=args.startdate,
                                               end_date=args.enddate)
+    """
+
+    new_transactions = import_transactions(args.csv_file, this_account)
+
+    """
+    db = TinyDB('journal.json')
+    for nt in new_transactions:
+        print(nt)
+        db.insert(nt)
+    """
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
-    write_transactions_to_file(args.output, new_transactions)
+    #write_transactions_to_file(args.output, new_transactions)
