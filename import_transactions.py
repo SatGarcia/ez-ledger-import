@@ -32,25 +32,24 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
         imports = source_db.table('imports')
         imports.truncate() # FIXME: remove this for final version
 
-        # TODO: make all_descriptions a dict from desc. to payee
-        all_descriptions = set()
+        payees = {}
         for row in source_db:
-            #if row['description'] not in all_descriptions:
-            #    all_descriptions.append(row['description'])
-            all_descriptions.add(row['description'])
+            description = row['description']
+            if description not in payees:
+                payees[description] = row['payee']
 
         for row in csv_reader:
-            print(row)
+            #print(row)
 
             if combined_debit_credit:
-                print(" || ".join(row[i] for i in [columns['date'],
-                                                         columns['desc'],
-                                                         columns['debit']]))
+                print("\n" + " || ".join(row[i] for i in [columns['date'],
+                                                             columns['desc'],
+                                                             columns['debit']]))
             else:
-                print(" || ".join(row[i] for i in [columns['date'],
-                                                         columns['desc'],
-                                                         columns['debit'],
-                                                         columns['credit']]))
+                print("\n" + " || ".join(row[i] for i in [columns['date'],
+                                                             columns['desc'],
+                                                             columns['debit'],
+                                                             columns['credit']]))
 
             # TODO: make this an assert?
             if not combined_debit_credit and row[columns['debit']] and row[columns['credit']]:
@@ -62,10 +61,6 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
 
             description = row[columns['desc']]
             transaction['description'] = description
-
-            # TODO: add description to all_descriptions
-            # Note that this will require some care with target and source
-            # tables
 
             this_account_amount = "$"
             if combined_debit_credit:
@@ -92,11 +87,10 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
             transaction['accounts'] = [account_info]
 
             close_matches = [name for name, score in process.extract(description,
-                                                                     all_descriptions)
+                                                                     payees.keys())
                              if score >= match_threshold]
 
-            close_payees = list(set([source_db.get(Query().description == desc)['payee']
-                                        for desc in close_matches]))
+            close_payees = list(set([payees[d] for d in close_matches]))
 
             if len(close_payees) == 0:
                 # no close matches
@@ -119,6 +113,10 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
                     payee = close_payees[selection - 1]
 
             transaction['payee'] = payee
+
+            if description not in payees:
+                payees[description] = payee
+
             #print(transaction)
             imports.insert(transaction)
 
