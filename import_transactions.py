@@ -57,6 +57,7 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
 
             transaction = dict()
             transaction['source_file'] = csv_filename
+            transaction['reviewed'] = False
             transaction['date'] = parse(row[columns['date']]).strftime("%Y-%m-%d")
 
             description = row[columns['desc']]
@@ -90,7 +91,11 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
                                                                      payees.keys())
                              if score >= match_threshold]
 
-            close_payees = list(set([payees[d] for d in close_matches]))
+            close_payees = []
+            for desc in close_matches:
+                p = payees[desc]
+                if p not in close_payees:
+                    close_payees.append(p)
 
             if len(close_payees) == 0:
                 # no close matches
@@ -101,12 +106,12 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
                 # print out each close match and ask user to select
                 print("\nClose Matches: (Select one)")
                 for i, p in enumerate(close_payees):
-                    #t = source_db.get(Query().description == desc)
                     print(i+1, ":", p)
 
                 print("0 : Other...")
 
-                selection = int(input("\nEnter the selection: "))
+                # TODO: Validate input
+                selection = int(input("\nEnter your selection: "))
                 if selection == 0:
                     payee = input("Enter Payee Name: ")
                 else:
@@ -114,14 +119,12 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
 
             transaction['payee'] = payee
 
+            # associate this payee with the description to improve matching on
+            # future imports from this file
             if description not in payees:
                 payees[description] = payee
 
-            #print(transaction)
             imports.insert(transaction)
-
-        for row in imports:
-            print(row)
 
 
 if __name__ == "__main__":
