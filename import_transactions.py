@@ -4,6 +4,14 @@ from tinydb import TinyDB, Query
 from fuzzywuzzy import process
 from dateutil.parser import parse
 
+def get_verified_response(prompt, valid_responses):
+    while True:
+        response = input(prompt)
+        if response not in valid_responses:
+            print("Invalid input. Try again.")
+        else:
+            return response
+
 def import_transactions(csv_filename, db_filename, this_account, match_threshold=60):
     """
     Imports data from CSV file into database table.
@@ -111,7 +119,8 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
                 print("0 : Other...")
 
                 # TODO: Validate input
-                selection = int(input("\nEnter your selection: "))
+                selection = int(get_verified_response("\nEnter your selection: ",
+                                                       [str(i) for i in range(len(close_payees)+1)]))
                 if selection == 0:
                     payee = input("Enter Payee Name: ")
                 else:
