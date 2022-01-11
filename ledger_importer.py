@@ -283,66 +283,31 @@ def read_bank_transactions(csv_filename, account_completer, this_account,
 
         return transactions
 
-def read_ledger_entries(ledger_filename, this_account):
+def get_frequencies(db):
     """
-    Reads an existing ledger file and returns a list of all accounts used in
-    this ledger file and a mapping between every transaction description (i.e.
-    payee) and a counter of the frequency with which accounts were used in
-    transactions with the same or similar description.
+    Gets list of unique accounts of existing transactions and a dictionary
+    that associates a payee with frequency of accounts used for that payee.
+
+    Params:
+    db (TinyDB) : The database to work with
     """
     all_accounts = set()
     associated_accounts = dict()
-    with open(ledger_filename) as ledger_file:
-        in_transaction = False
-        payee = ""
+    #with open(ledger_filename) as ledger_file:
+    for row in db:
+        payee = row['payee']
+        if payee not in associated_accounts:
+            associated_accounts[payee] = collections.Counter()
 
-        for line in ledger_file:
-            line = line.rstrip()
-            #print(line)
+        accounts = row['accounts']
 
-            if not line:
-                in_transaction = False
-
-            elif line[0] == ' ' or line[0] == '\t':
-                if not in_transaction:
-                    print("Ruh roh!")
-                    sys.exit(1)
-
-                # remove leading whitespace
-                line = line.lstrip()
-
-                line_without_comment = get_string_without_comment(line)
-                components = re.split("(?: *\t+|  )+", line_without_comment)
-                if len(components) > 2:
-                    print("invalid format:", line_without_comment)
-                    sys.exit(1)
-
-                account = components[0]
-                all_accounts.add(account)
-                if account != this_account:
-                    #print("account:", account)
-                    associated_accounts[payee].update([account])
-
-            # this should be the start of a new transaction
-            else:
-                # use split to separate out the comment
-                header = get_string_without_comment(line)
-
-                # fixme: come up with more accurate regex for date
-                re_match = re.match("\d+\S*\s+(?:[*!]\s+)?(?:\(\S+\)\s+)?(.*)", header)
-                if not re_match:
-                    print("invalid transaction header:", header)
-                    sys.exit(1)
-
-                payee = re_match.group(1)
-                #print("payee:", payee)
-
-                if not payee in associated_accounts:
-                    associated_accounts[payee] = collections.Counter()
-
-                in_transaction = True
+        for account in accounts:
+            account_name = account['account']
+            all_accounts.add(account_name)
+            associated_accounts[payee].update([account_name])
 
     return all_accounts, associated_accounts
+
 
 def get_printable_string(transaction):
     """
@@ -375,23 +340,31 @@ def write_transactions_to_file(output_filename, transactions):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("training_data", help="Ledger file used for learning.")
-    parser.add_argument("csv_file", help="CSV file financial transactions.")
-    parser.add_argument("output", help="File to which new entries are written.")
-    parser.add_argument("--account", help="Account associated with transactions.")
+    #parser.add_argument("training_data", help="Ledger file used for learning.")
+    parser.add_argument("db_filename", help="TinyDB file with transactions.")
+    #parser.add_argument("output", help="File to which new entries are written.")
+    #parser.add_argument("--account", help="Account associated with transactions.")
     parser.add_argument("--startdate", type=parse,
                         help="All entries BEFORE this datw will be ignored")
     parser.add_argument("--enddate", type=parse,
                         help="All entries AFTER this datw will be ignored")
     args = parser.parse_args()
 
+    """
     if args.account:
         this_account = args.account
     else:
         this_account = input("Enter the CSV file's account name: ")
+    """
 
-    all_accounts, assoc_accounts = read_ledger_entries(args.training_data,
-                                                       this_account)
+    db = TinyDB(args.db_filename, sort_keys=True, indent=4, separators=(',', ': '))
+
+    all_accounts, assoc_accounts = get_frequencies(db)
+    for a in all_accounts:
+        print(a)
+
+    print("Vons:", assoc_accounts['Vons'])
+    sys.exit(0)
 
     completer = AccountCompleter(list(all_accounts))
     readline.set_completer_delims(':')
@@ -408,8 +381,6 @@ if __name__ == "__main__":
                                               start_date=args.startdate,
                                               end_date=args.enddate)
     """
-
-    new_transactions = import_transactions(args.csv_file, "converted.json", this_account)
 
     """
     db = TinyDB('journal.json', sort_keys=True, indent=4, separators=(',', ': '))
