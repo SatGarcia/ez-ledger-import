@@ -94,6 +94,22 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
 
             transaction['accounts'] = [account_info]
 
+            # check to see if this entry has already been imported
+            Transaction = Query()
+            already_imported = imports.contains((Transaction.source_file == transaction['source_file'])
+                               & (Transaction.date == transaction['date'])
+                               & (Transaction.description == transaction['description'])
+                               & (Transaction.accounts.any(Query().amount == this_account_amount)))
+
+
+            if already_imported:
+                skip = get_verified_response("Duplicate import detected. Skip entry? (y/n) ",
+                                             ['y', 'n'])
+                if skip == 'y':
+                    continue
+
+            # Look for descriptions that match (or are close) to this one so
+            # we can get some payee suggestions
             close_matches = [name for name, score in process.extract(description,
                                                                      payees.keys())
                              if score >= match_threshold]
