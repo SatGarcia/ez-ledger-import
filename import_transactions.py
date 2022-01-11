@@ -38,7 +38,6 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
         source_db = TinyDB(db_filename, sort_keys=True, indent=4, separators=(',', ': '))
 
         imports = source_db.table('imports')
-        imports.truncate() # FIXME: remove this for final version
 
         payees = {}
         for row in source_db:
