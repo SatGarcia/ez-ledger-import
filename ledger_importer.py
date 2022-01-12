@@ -197,7 +197,7 @@ def set_accounts(transaction, account_completer, associated_accounts):
         return True
 
 
-def review_imports(db, account_completer, associated_accounts,
+def review_imports(db, account_completer, associated_accounts, target_payee=None,
                    start_date=None, end_date=None):
     """
     Review any unreviewed imports. Reviewing requires setting the associated
@@ -206,9 +206,16 @@ def review_imports(db, account_completer, associated_accounts,
 
     imports_table = db.table('imports')
 
-    for transaction in imports_table:
-        if transaction['reviewed'] == True:
-            continue
+    Transaction = Query()
+
+    if target_payee is None:
+        unreviewed_transactions = imports_table.search(Transaction.reviewed == False)
+    else:
+        unreviewed_transactions = imports_table.search((Transaction.reviewed == False) &
+                                                       (Transaction.payee == target_payee))
+
+    for transaction in unreviewed_transactions:
+        assert transaction['reviewed'] == False
 
         assert len(transaction['accounts']) == 1, "Unreviewed imports should have only one account"
 
@@ -293,7 +300,8 @@ def cli():
 
 @cli.command()
 @click.argument("db_filename")
-def review(db_filename):
+@click.option("--payee", help="Limit review to transactions with the given payee")
+def review(db_filename, payee):
     """
     Starts review of imported transactions in DB_FILENAME.
 
@@ -320,7 +328,7 @@ def review(db_filename):
     readline.parse_and_bind("bind -e")
     readline.parse_and_bind("bind '\t' rl_complete")
 
-    review_imports(db, completer, assoc_accounts)
+    review_imports(db, completer, assoc_accounts, target_payee=payee)
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
