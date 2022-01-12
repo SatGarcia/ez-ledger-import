@@ -300,6 +300,23 @@ def cli():
 
 @cli.command()
 @click.argument("db_filename")
+@click.option("--count", default=10, help="Number of payees to print")
+def top_payees(db_filename, count):
+    """Prints out the COUNT most frequent payees for unreviewed imports in DB_FILENAME."""
+
+    db = TinyDB(db_filename, sort_keys=True, indent=4, separators=(',', ': '))
+    imports_table = db.table('imports')
+
+    unreviewed = imports_table.search(Query().reviewed == False)
+    print("Number of unreviewed:", len(unreviewed))
+    c = collections.Counter([t['payee'] for t in unreviewed])
+
+    for payee, count in c.most_common(count):
+        print(f"{payee} ({count})")
+
+
+@cli.command()
+@click.argument("db_filename")
 @click.option("--payee", help="Limit review to transactions with the given payee")
 def review(db_filename, payee):
     """
