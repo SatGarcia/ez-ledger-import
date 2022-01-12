@@ -1,4 +1,5 @@
 import csv, sys, re, collections, readline, argparse
+import pprint, json
 
 from tinydb import TinyDB, Query
 from fuzzywuzzy import process
@@ -221,16 +222,14 @@ def review_imports(db, account_completer, associated_accounts,
             # done.
             transaction['reviewed'] = True
 
-            print("Completed Transaction:")
-            print(transaction)
+            #print("Completed Transaction:")
+            #print(json.dumps(transaction, indent=4))
 
             imports_table.update({'reviewed': True}, doc_ids=[transaction.doc_id])
 
             # TODO: add final confirmation after printing transaction info?
 
             db.insert(dict(transaction))
-
-        sys.exit(0)
 
 
 def get_frequencies(db):
