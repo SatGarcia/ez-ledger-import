@@ -1,5 +1,5 @@
 import csv, sys, re, collections, readline, argparse
-import pprint, json
+import json, click
 
 from tinydb import TinyDB, Query
 from fuzzywuzzy import process
@@ -287,36 +287,29 @@ def write_transactions_to_file(output_filename, transactions):
             output_file.write(get_printable_string(t))
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    #parser.add_argument("training_data", help="Ledger file used for learning.")
-    parser.add_argument("db_filename", help="TinyDB file with transactions.")
-    #parser.add_argument("output", help="File to which new entries are written.")
-    #parser.add_argument("--account", help="Account associated with transactions.")
+@click.group()
+def cli():
+    pass
+
+@cli.command()
+@click.argument("db_filename")
+def review(db_filename):
+    """
+    Starts review of imported transactions in DB_FILENAME.
+
+    DB_FILENAME is the TinyDB file with transactions.
+    """
+
+    """
     parser.add_argument("--startdate", type=parse,
                         help="All entries BEFORE this datw will be ignored")
     parser.add_argument("--enddate", type=parse,
                         help="All entries AFTER this datw will be ignored")
-    args = parser.parse_args()
-
-    """
-    if args.account:
-        this_account = args.account
-    else:
-        this_account = input("Enter the CSV file's account name: ")
     """
 
-    db = TinyDB(args.db_filename, sort_keys=True, indent=4, separators=(',', ': '))
+    db = TinyDB(db_filename, sort_keys=True, indent=4, separators=(',', ': '))
 
     all_accounts, assoc_accounts = get_frequencies(db)
-
-    """
-    for a in all_accounts:
-        print(a)
-
-    print("Vons:", assoc_accounts['Vons'])
-    sys.exit(0)
-    """
 
     completer = AccountCompleter(list(all_accounts))
     readline.set_completer_delims(':')
@@ -327,14 +320,11 @@ if __name__ == "__main__":
     readline.parse_and_bind("bind -e")
     readline.parse_and_bind("bind '\t' rl_complete")
 
-    """
-    new_transactions = read_bank_transactions(args.csv_file, completer,
-                                              this_account, assoc_accounts,
-                                              start_date=args.startdate,
-                                              end_date=args.enddate)
-    """
     review_imports(db, completer, assoc_accounts)
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
     #write_transactions_to_file(args.output, new_transactions)
+
+if __name__ == "__main__":
+    cli()
