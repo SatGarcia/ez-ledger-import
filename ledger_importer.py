@@ -5,10 +5,7 @@ from fuzzywuzzy import process
 from account_completer import AccountCompleter
 from dateutil.parser import parse
 
-def get_string_without_comment(str):
-    return re.split("(?:  +| *\t+);", str)[0]
-
-def get_account_from_user(completer, tax_amount = "1.0775"):
+def get_account_from_user(completer, tax_amount="1.0775"):
     """
     Asks user for the name of an account, adding it to our list of accounts in
     our auto completer.
@@ -16,7 +13,7 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
     account_name = input("Enter account name: ")
     account_name = account_name.strip()
     amount = ''
-    comments = ''
+    comment = ''
 
     if account_name:
         completer.add_account(account_name)
@@ -28,7 +25,7 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
             split_input = [s.strip() for s in user_input.split(';')]
             individual_amounts = split_input[0]
             if len(split_input) > 1:
-                comments = (';'.join(split_input[1:]))
+                comment = (';'.join(split_input[1:]))
 
             # If they entered something, make sure it is of the right format and
             # parse it into ledger format
@@ -44,46 +41,67 @@ def get_account_from_user(completer, tax_amount = "1.0775"):
                 print("Invalid format.")
 
 
-    return account_name, amount, comments
+    return account_name, amount, comment
 
 def handle_split(completer):
     """
-    Returns a dictionary mapping accounts with associated amount, as entered
-    by the user.
+    Returns a list of dictionaries with account info. See get_match_selection
+    for a description of these dictionaries.
+
+    If there was an error, a blank list is returned.
     """
-    account_info = dict()
-    next_account, amount, comments = get_account_from_user(completer)
-    while next_account:
-        # TODO: should we warn user here in case they messed it up?
-        if not next_account in account_info:
-            account_info[next_account] = (amount, comments)
+    selected_accounts = []
+    account_name, amount, comment = get_account_from_user(completer)
+    while account_name != "":
+        existing_account = None
+        for sa in selected_accounts:
+            if sa['account'] == account_name:
+                existing_account = sa
+                break
+
+        if existing_account is None:
+            # first time entering this account name so create new dict
+            new_account = {'account': account_name}
+            if amount:
+                new_account['amount'] = amount
+            if comment:
+                new_account['comment'] = comment
+            selected_accounts.append(new_account)
+
         else:
             # if account was already used, add new info to the old
-            old_amount, old_comments = account_info[next_account]
-            account_info[next_account] = ("(" + old_amount + "+" + amount + ")",
-                                          old_comments + " ; " + comments)
+            if amount and ('amount' in existing_account):
+                existing_account['amount'] = "(" + existing_account['amount'] + "+" + amount + ")"
+            elif amount:
+                # blank amount for existing implies they wanted auto-balance
+                # but this goes against that so we need them to start over
+                print("ERROR: Conflicting auto-balance directive for", account_name)
+                return []
 
-        next_account, amount, comments = get_account_from_user(completer)
+            if comment and ('comment' in existing_account):
+                existing_account['comment'] += (" ; " + comment)
+            elif comment:
+                existing_account['comment'] = comment
 
-    #print(account_info)
-    return account_info
+        account_name, amount, comment = get_account_from_user(completer)
 
-def get_match_selection(completer, matches, associated_accounts):
+    return selected_accounts
+
+def get_match_selection(frequencies, completer):
     """
-    Returns a dictionary mapping account names to the amount associated with
-    that account for this transaction.
+    Returns a list of dictionaries containing account information for selected
+    accounts. Each dictionary will contain at least the account name; it may
+    also contain an amount and a comment. A missing amount means
+    auto-balancing should be used.
+
+    If the user selects to "snooze", a blank list will be returned.
     """
-    frequencies = collections.Counter()
-    for m in matches:
-        frequencies += associated_accounts[m]
 
     top_accounts = frequencies.most_common(9)
 
     # start index at 1 for more user-friendliness
-    i = 1
-    for acc in top_accounts:
-        print(i, ":", acc[0])
-        i += 1
+    for i, (acc, _) in enumerate(top_accounts):
+        print(i+1, ":", acc)
 
     print("o : Other / Split...")
     print("s : Snooze")
@@ -93,195 +111,127 @@ def get_match_selection(completer, matches, associated_accounts):
         if selection.isdigit():
             # use blank ammount (which will auto-balance) and comment for
             # pre-selection
-            account_info = dict()
             selected_index = int(selection)
             if selected_index > 0 and selected_index <= len(top_accounts):
-                account_info[top_accounts[selected_index-1][0]] = ('', '')
-                break
+                account_info = {"account": top_accounts[selected_index-1][0]}
+                return [account_info]
             else:
                 print("Invalid selection!")
         elif selection == 'o':
-            account_info = handle_split(completer)
-            break
+            selected_accounts = handle_split(completer)
+            while not selected_accounts:
+                # empty list means something went wrong so let's restart the
+                # splitting process
+                print("WARNING: Restarting selection process")
+                selected_accounts = handle_split(completer)
+
+            return selected_accounts
+
         elif selection == 's':
-            account_info = None
-            break
+            return []
+
         else:
             print("Invalid selection!")
 
-    return account_info
 
 
-def get_accounts(account_completer, desc, associated_accounts, match_threshold=90):
+def get_accounts(payee, target_account, account_completer, associated_accounts):
     """
-    Returns dictionary that maps accounts to their associated amounts for the
-    transaction with the given description.
-    This also updates the list of associated accounts for desc, so we have a
+    Returns list of dictionaries, one for each account associated with this
+    transaction. Each dictionary will contain the account name, amount, and
+    and (optional) comments.
+
+    This also updates the list of associated accounts for payee, so we have a
     history for improving future transactions with the same or similar
     description.
     """
-    desc = re.sub('PAYPAL \*|SQ \*', '', desc)
-    close_matches = [name for name, score in process.extract(desc,
-                                                             associated_accounts.keys())
-                     if score >= match_threshold]
 
-    if close_matches:
-        accounts = get_match_selection(account_completer, close_matches, associated_accounts)
-        if accounts is not None:
-            if desc in associated_accounts:
-                associated_accounts[desc].update(accounts.keys())
-            else:
-                associated_accounts[desc] = collections.Counter(accounts.keys())
+    payee_accounts = associated_accounts.get(payee)
+
+    if payee_accounts is not None:
+        # We have associated accounts from 1+ previous transactions for this payee
+
+        # remove the target_account name to avoid confusion
+        target_counter = payee_accounts[target_account]
+        del payee_accounts[target_account]
+
+        accounts = get_match_selection(payee_accounts, account_completer)
+
+        if target_counter > 0:
+            payee_accounts[target_account] = target_counter
+
     else:
-        print("Could not find a previous transaction that is a close match.")
-        print("o : Other / Split...")
-        print("s : Snooze")
+        # First time we're seeing this payee so create a new counter for it
+        payee_accounts = collections.Counter()
+        associated_accounts[payee] = payee_accounts
 
-        valid_selection = False
+        accounts = get_match_selection(payee_accounts, account_completer)
 
-        while True:
-            selection = input("\nEnter selection: ")
-            if selection == 'o':
-                accounts = handle_split(account_completer)
-                associated_accounts[desc] = collections.Counter(accounts.keys())
-                break
-            elif selection == 's':
-                return None
-            else:
-                print("Invalid selection!")
+
+    if accounts:
+        # user didn't snooze so update payee's counter for all the selected
+        # accounts (this improves matching for future imports)
+        for acc in accounts:
+            payee_accounts[acc['account']] += 1
 
     return accounts
 
-def create_transaction(csv_entry, columns, account_completer,
-                       associated_accounts):
-    """ Create a transaction based on the given CSV file entry. """
-
-    print()
-
-    combined_debit_credit = columns['debit'] == columns['credit']
-
-    if combined_debit_credit:
-        print(" || ".join(csv_entry[i] for i in [columns['date'],
-                                                 columns['desc'],
-                                                 columns['debit']]))
-    else:
-        print(" || ".join(csv_entry[i] for i in [columns['date'],
-                                                 columns['desc'],
-                                                 columns['debit'],
-                                                 columns['credit']]))
-
-    transaction = dict()
-    transaction['date'] = parse(csv_entry[columns['date']]).strftime("%Y-%m-%d")
-    transaction['description'] = csv_entry[columns['desc']]
-
-    # TODO: make sure there isn't a "$" in debit or credit column
-
-    accounts = dict()
-    x = get_accounts(account_completer, csv_entry[columns['desc']], associated_accounts)
-
-    if x is None:
-        """ User chose to 'snooze' processing this entry so there is no
-        transaction to return now. """
-        return None
-    else:
-        accounts.update(x)
-
-
-    if not combined_debit_credit and csv_entry[columns['debit']] and csv_entry[columns['credit']]:
-        raise RuntimeError("Entry has both debit and credit")
-
-    this_account_amount = "$"
-    if combined_debit_credit:
-        if csv_entry[columns['debit']][0] == "-":
-            # "-" with combined debit/credit implies credit, i.e.
-            # positive amount for this_account
-            this_account_amount += csv_entry[columns['debit']][1:]
-        else:
-            # lack of "-" for combined debit/credit implies debit,
-            # i.e.  negative amount from this_account
-            this_account_amount += "-" + csv_entry[columns['debit']]
-    elif csv_entry[columns['debit']]:
-        if csv_entry[columns['debit']][0] != "-":
-            this_account_amount += "-"
-        this_account_amount += csv_entry[columns['debit']]
-    else:
-        this_account_amount += csv_entry[columns['credit']]
-
-    accounts[this_account] = (this_account_amount, '') # empty string is for blank transation comment
-
-    transaction['accounts'] = accounts
-
-    return transaction
-
-
-def read_bank_transactions(csv_filename, account_completer, this_account,
-                           associated_accounts, start_date=None,
-                           end_date=None):
+def set_accounts(transaction, account_completer, associated_accounts):
     """
-    Returns a list of transactions based on a given CSV file.
-    Each transaction will include the date, a description of the transaction
-    (i.e. the payee), and a dictionary mapping the accounts used by this
-    transaction and the amount of money associated with that account for this
-    transaction.
+    Set the accounts/amounts for this transaction.
+
+    Return:
+    boolean: True if accounts set, False otherwise
     """
-    with open(csv_filename, newline='') as csv_file:
-        csv_has_header = csv.Sniffer().has_header(csv_file.read(1024))
-        if csv_has_header:
-            start_index = 1
-        else:
-            start_index = 0
 
-        csv_file.seek(0)
+    accounts = get_accounts(transaction['payee'],
+                            transaction['accounts'][0]['account'],
+                            account_completer, associated_accounts)
 
-        csv_reader = csv.reader(csv_file)
-        rows = []
-        for row in csv_reader:
-            print(row)
-            rows += [row]
-
-        for i in range(len(rows[0])):
-            print(i, ":", rows[0][i])
-
-        columns = {}
-        columns['date'] = int(input("Which entry contains the transaction date? "))
-        columns['desc'] = int(input("Which entry contains the description? "))
-        columns['debit'] = int(input("Which entry contains the debit amount? "))
-        columns['credit'] = int(input("Which entry contains the credit amount? "))
+    if accounts == []:
+        # User chose to skip reviewing this transaction
+        return False
+    else:
+        transaction['accounts'] += accounts
+        return True
 
 
+def review_imports(db, account_completer, associated_accounts,
+                   start_date=None, end_date=None):
+    """
+    Review any unreviewed imports. Reviewing requires setting the associated
+    accounts and amounts for the transaction.
+    """
 
-        sorted_rows = sorted(rows[start_index:],
-                             key=lambda r: parse(r[columns['date']]))
+    imports_table = db.table('imports')
 
-        if start_date is None:
-            start_date = parse("1900-01-01")
-        if end_date is None:
-            end_date = parse("3005-12-31")  # childish
+    for transaction in imports_table:
+        if transaction['reviewed'] == True:
+            continue
 
-        filtered_rows = filter(lambda r: start_date <= parse(r[columns['date']]) <= end_date, sorted_rows)
+        assert len(transaction['accounts']) == 1, "Unreviewed imports should have only one account"
 
-        transactions = []
-        snoozed_entries = []
-        for entry in filtered_rows:
-            t = create_transaction(entry, columns, account_completer,
-                                   associated_accounts)
-            if t is not None:
-                transactions.append(t)
-            else:
-                snoozed_entries.append(entry)
+        print("\n" + " || ".join([transaction['date'], transaction['payee'],
+                                  transaction['accounts'][0]['amount']]))
 
-        while snoozed_entries:
-            """ Keep looping through snoozed entries while there are any. """
-            t = create_transaction(snoozed_entries[0], columns, account_completer,
-                                   associated_accounts)
-            if t is not None:
-                transactions.append(t)
-            else:
-                snoozed_entries.append(snoozed_entries[0])
+        completed = set_accounts(transaction, account_completer, associated_accounts)
 
-            del snoozed_entries[0]
+        if completed:
+            # Accounts were updated so the review process for this import is
+            # done.
+            transaction['reviewed'] = True
 
-        return transactions
+            print("Completed Transaction:")
+            print(transaction)
+
+            imports_table.update({'reviewed': True}, doc_ids=[transaction.doc_id])
+
+            # TODO: add final confirmation after printing transaction info?
+
+            db.insert(dict(transaction))
+
+        sys.exit(0)
+
 
 def get_frequencies(db):
     """
@@ -304,7 +254,7 @@ def get_frequencies(db):
         for account in accounts:
             account_name = account['account']
             all_accounts.add(account_name)
-            associated_accounts[payee].update([account_name])
+            associated_accounts[payee][account_name] += 1
 
     return all_accounts, associated_accounts
 
@@ -360,11 +310,14 @@ if __name__ == "__main__":
     db = TinyDB(args.db_filename, sort_keys=True, indent=4, separators=(',', ': '))
 
     all_accounts, assoc_accounts = get_frequencies(db)
+
+    """
     for a in all_accounts:
         print(a)
 
     print("Vons:", assoc_accounts['Vons'])
     sys.exit(0)
+    """
 
     completer = AccountCompleter(list(all_accounts))
     readline.set_completer_delims(':')
@@ -381,13 +334,7 @@ if __name__ == "__main__":
                                               start_date=args.startdate,
                                               end_date=args.enddate)
     """
-
-    """
-    db = TinyDB('journal.json', sort_keys=True, indent=4, separators=(',', ': '))
-    for nt in new_transactions:
-        print(nt)
-        db.insert(nt)
-    """
+    review_imports(db, completer, assoc_accounts)
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
