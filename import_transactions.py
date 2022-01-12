@@ -40,10 +40,11 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
         imports = source_db.table('imports')
 
         payees = {}
-        for row in source_db:
-            description = row['description']
-            if description not in payees:
-                payees[description] = row['payee']
+        for table in [source_db, imports]:
+            for row in table:
+                description = row['description']
+                if description not in payees:
+                    payees[description] = row['payee']
 
         for row in csv_reader:
             #print(row)
