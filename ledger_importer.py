@@ -219,8 +219,12 @@ def review_imports(db, account_completer, associated_accounts, target_payee=None
 
         assert len(transaction['accounts']) == 1, "Unreviewed imports should have only one account"
 
-        print("\n" + " || ".join([transaction['date'], transaction['payee'],
-                                  transaction['accounts'][0]['amount']]))
+        print("\n" + " || ".join([
+                                    transaction['date'], transaction['payee'],
+                                    transaction['accounts'][0]['amount'],
+                                    transaction['accounts'][0]['account'],
+                                    transaction['description']
+                                  ]))
 
         completed = set_accounts(transaction, account_completer, associated_accounts)
 
