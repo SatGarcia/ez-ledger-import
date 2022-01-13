@@ -214,6 +214,8 @@ def review_imports(db, account_completer, associated_accounts, target_payee=None
         unreviewed_transactions = imports_table.search((Transaction.reviewed == False) &
                                                        (Transaction.payee == target_payee))
 
+    unreviewed_transactions.sort(key=lambda t: t['date'])
+
     for transaction in unreviewed_transactions:
         assert transaction['reviewed'] == False
 
