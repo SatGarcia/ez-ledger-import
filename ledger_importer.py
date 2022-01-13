@@ -5,6 +5,7 @@ from tinydb import TinyDB, Query
 from fuzzywuzzy import process
 from account_completer import AccountCompleter
 from dateutil.parser import parse
+from datetime import date
 
 def get_account_from_user(completer, tax_amount="1.0775"):
     """
@@ -208,11 +209,18 @@ def review_imports(db, account_completer, associated_accounts, target_payee=None
 
     Transaction = Query()
 
-    if target_payee is None:
-        unreviewed_transactions = imports_table.search(Transaction.reviewed == False)
-    else:
-        unreviewed_transactions = imports_table.search((Transaction.reviewed == False) &
-                                                       (Transaction.payee == target_payee))
+    search_string = (Transaction.reviewed == False)
+
+    if start_date:
+        search_string = search_string & (Transaction.date >= start_date)
+
+    if end_date:
+        search_string = search_string & (Transaction.date <= end_date)
+
+    if target_payee:
+        search_string = search_string & (Transaction.payee == target_payee)
+
+    unreviewed_transactions = imports_table.search(search_string)
 
     unreviewed_transactions.sort(key=lambda t: t['date'])
 
@@ -324,19 +332,20 @@ def top_payees(db_filename, count):
 @cli.command()
 @click.argument("db_filename")
 @click.option("--payee", help="Limit review to transactions with the given payee")
-def review(db_filename, payee):
+@click.option('--start-date', type=click.DateTime(formats=["%Y-%m-%d"]),
+              help="Starting date of transactions to review.")
+@click.option('--end-date', type=click.DateTime(formats=["%Y-%m-%d"]),
+              help="Ending date of transactions to review.")
+def review(db_filename, payee, start_date, end_date):
     """
     Starts review of imported transactions in DB_FILENAME.
 
     DB_FILENAME is the TinyDB file with transactions.
     """
 
-    """
-    parser.add_argument("--startdate", type=parse,
-                        help="All entries BEFORE this datw will be ignored")
-    parser.add_argument("--enddate", type=parse,
-                        help="All entries AFTER this datw will be ignored")
-    """
+    if start_date and end_date and (start_date >= end_date):
+        print("Start date must come BEFORE end date.")
+        sys.exit(1)
 
     db = TinyDB(db_filename, sort_keys=True, indent=4, separators=(',', ': '))
 
@@ -351,7 +360,14 @@ def review(db_filename, payee):
     readline.parse_and_bind("bind -e")
     readline.parse_and_bind("bind '\t' rl_complete")
 
-    review_imports(db, completer, assoc_accounts, target_payee=payee)
+    if start_date:
+        start_date = str(start_date.date())
+    if end_date:
+        end_date = str(end_date.date())
+
+    review_imports(db, completer, assoc_accounts,
+                   target_payee=payee,
+                   start_date=start_date, end_date=end_date)
 
     # TODO: allow user to specify whether to append or to overwrite the output
     # file
