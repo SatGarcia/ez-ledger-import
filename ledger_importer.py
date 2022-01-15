@@ -109,17 +109,33 @@ def get_match_selection(frequencies, completer):
     print("s : Snooze")
 
     while True:
-        selection = input("\nEnter selection: ")
-        if selection.isdigit():
-            # use blank ammount (which will auto-balance) and comment for
-            # pre-selection
-            selected_index = int(selection)
+        user_input = input("\nEnter selection: ")
+        matched = re.match("(?:(?P<selected_num>\d)(?:\s+;\s*(?P<comment>.*))?|(?P<selected_option>[os]))",
+                           user_input)
+
+        if not matched:
+            print("Invalid input!")
+
+        elif matched.group('selected_num'):
+            # user selected one of the top accounts
+
+            # Note: The selected account will have no ammount (which will auto-balance)
+            selected_index = int(matched.group('selected_num'))
             if selected_index > 0 and selected_index <= len(top_accounts):
                 account_info = {"account": top_accounts[selected_index-1][0]}
+
+                # add a comment (if one given)
+                comment = matched.group('comment')
+                if comment:
+                    account_info['comment'] = comment
+
                 return [account_info]
             else:
                 print("Invalid selection!")
-        elif selection == 'o':
+
+        elif matched.group('selected_option') == 'o':
+            # user opted to split into multiple accounts
+
             selected_accounts = handle_split(completer)
             while not selected_accounts:
                 # empty list means something went wrong so let's restart the
@@ -129,11 +145,12 @@ def get_match_selection(frequencies, completer):
 
             return selected_accounts
 
-        elif selection == 's':
+        elif matched.group('selected_option') == 's':
+            # user opted to skip this transaction
             return []
 
         else:
-            print("Invalid selection!")
+            assert False, "regular expression meltdown"
 
 
 
