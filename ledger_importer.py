@@ -215,7 +215,8 @@ def set_accounts(transaction, account_completer, associated_accounts):
         return True
 
 
-def review_imports(db, account_completer, associated_accounts, target_payee=None,
+def review_imports(db, account_completer, associated_accounts, 
+                   target_payee=None, target_amount=None,
                    start_date=None, end_date=None):
     """
     Review any unreviewed imports. Reviewing requires setting the associated
@@ -236,6 +237,9 @@ def review_imports(db, account_completer, associated_accounts, target_payee=None
 
     if target_payee:
         search_string = search_string & (Transaction.payee == target_payee)
+
+    if target_amount:
+        search_string = search_string & (Transaction.accounts.any(Query().amount == target_amount))
 
     unreviewed_transactions = imports_table.search(search_string)
 
@@ -349,11 +353,12 @@ def top_payees(db_filename, count):
 @cli.command()
 @click.argument("db_filename")
 @click.option("--payee", help="Limit review to transactions with the given payee")
+@click.option("--amount", help="Limit review to transactions with the given amount")
 @click.option('--start-date', type=click.DateTime(formats=["%Y-%m-%d"]),
               help="Starting date of transactions to review.")
 @click.option('--end-date', type=click.DateTime(formats=["%Y-%m-%d"]),
               help="Ending date of transactions to review.")
-def review(db_filename, payee, start_date, end_date):
+def review(db_filename, payee, amount, start_date, end_date):
     """
     Starts review of imported transactions in DB_FILENAME.
 
@@ -383,7 +388,7 @@ def review(db_filename, payee, start_date, end_date):
         end_date = str(end_date.date())
 
     review_imports(db, completer, assoc_accounts,
-                   target_payee=payee,
+                   target_payee=payee, target_amount=amount,
                    start_date=start_date, end_date=end_date)
 
     # TODO: allow user to specify whether to append or to overwrite the output
