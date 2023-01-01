@@ -73,6 +73,9 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
 
             this_account_amount = "$"
             if combined_debit_credit:
+                # FIXME: assumption about '-' sign in combined account is not
+                # correct. Should require user to specify what negative means
+                # via a CLI option.
                 if row[columns['debit']][0] == "-":
                     # "-" with combined debit/credit implies credit, i.e.
                     # positive amount for this_account
