@@ -324,16 +324,23 @@ def get_printable_string(transaction):
     return s
 
 
-def write_transactions_to_file(output_filename, transactions):
+def write_transactions(db_filename, output_filename, start_date,
+                               end_date):
     """
-    Writes given transactions out in ledger format to the specified output
-    file.
+    Writes transactions out in ledger format to the specified output
+    file. Only reviwed transactions within the specified range (start_date and
+    end_date) will be written.
     """
-    with open(output_filename, "a") as output_file:
-        # sort transactions by date before writing them to file
-        sorted_transactions = sorted(transactions, key=lambda t: t['date'])
+    db = TinyDB(db_filename, sort_keys=True, indent=4, separators=(',', ': '))
 
-        for t in sorted_transactions:
+    Transaction = Query()
+    search_string = (Transaction.reviewed == True) & (Transaction.date >= start_date) & (Transaction.date <= end_date)
+
+    transactions = db.search(search_string)
+    transactions.sort(key=lambda t: t['date'])
+
+    with open(output_filename, 'w') as output_file:
+        for t in transactions:
             output_file.write(get_printable_string(t))
 
 
@@ -357,6 +364,19 @@ def top_payees(db_filename, count):
     for payee, count in c.most_common(count):
         print(f"{payee} ({count})")
 
+
+@cli.command()
+@click.argument("db_filename")
+@click.argument("output_filename")
+@click.option('--start-date', type=click.DateTime(formats=["%Y-%m-%d"]),
+              required=True, help="Starting date of transactions to export.")
+@click.option('--end-date', type=click.DateTime(formats=["%Y-%m-%d"]),
+              required=True, help="Ending date of transactions to export.")
+def export(db_filename, output_filename, start_date, end_date):
+
+    write_transactions(db_filename, output_filename,
+                       start_date=str(start_date.date()),
+                       end_date=str(end_date.date()))
 
 @cli.command()
 @click.argument("db_filename")
