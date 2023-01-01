@@ -215,7 +215,7 @@ def set_accounts(transaction, account_completer, associated_accounts):
         return True
 
 
-def review_imports(db, account_completer, associated_accounts, 
+def review_imports(db, account_completer, associated_accounts,
                    target_payee=None, target_amount=None,
                    start_date=None, end_date=None):
     """
@@ -304,12 +304,20 @@ def get_printable_string(transaction):
     """
     Returns a "Ledger-style" string representation of the tranaction.
     """
-    s = transaction['date'] + " " + transaction['description'] + "\n";
-    for acc, (amt, comm) in transaction['accounts'].items():
-        s += "\t" + acc + "\t\t" + amt
-        if comm:
-            # add comment(s) if there are any
-            s += "\t; " + comm
+    #print(transaction)
+    s = transaction['date'] + " " + transaction['payee'] + "\n";
+    for account in transaction['accounts']:
+        #print(account)
+        account_name = account['account']
+
+        # Note: amount will be missing (i.e. blank) if auto-balancing
+        amount = account.get('amount', '')
+
+        s += "\t" + account_name + "\t\t" + amount
+
+        comment = account.get('comment')
+        if comment:
+            s += "\t; " + comment
         s += "\n"
 
     s += "\n"   # blank line after transaction, muy importante
