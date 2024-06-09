@@ -31,7 +31,7 @@ def get_account_from_user(completer, tax_amount="1.0775"):
 
             # If they entered something, make sure it is of the right format and
             # parse it into ledger format
-            if re.fullmatch("((?:^|\s+)\d+(?:\.\d\d)?\*?)*", individual_amounts):
+            if re.fullmatch(r"((?:^|\s+)\d+(?:\.\d\d)?\*?)*", individual_amounts):
                 if individual_amounts:
                     raw_amounts = individual_amounts.split()
                     # "*" after amount indicates it is untaxed
@@ -110,7 +110,7 @@ def get_match_selection(frequencies, completer):
 
     while True:
         user_input = input("\nEnter selection: ")
-        matched = re.match("(?:(?P<selected_num>\d)(?:\s+;\s*(?P<comment>.*))?|(?P<selected_option>[os]))",
+        matched = re.match(r"(?:(?P<selected_num>\d)(?:\s+;\s*(?P<comment>.*))?|(?P<selected_option>[os]))",
                            user_input)
 
         if not matched:
