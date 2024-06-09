@@ -1,0 +1,8 @@
+click==8.1.7
+fuzzywuzzy==0.18.0
+Levenshtein==0.25.1
+python-dateutil==2.9.0.post0
+python-Levenshtein==0.25.1
+rapidfuzz==3.9.3
+six==1.16.0
+tinydb==4.8.0
