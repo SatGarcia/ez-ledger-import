@@ -378,6 +378,21 @@ def export(db_filename, output_filename, start_date, end_date):
                        start_date=str(start_date.date()),
                        end_date=str(end_date.date()))
 
+
+@cli.command()
+@click.argument("db_filename")
+def cleanup(db_filename):
+    """
+    Cleans up imports table by removing any listed as reviewed.
+
+    DB_FILENAME is the TinyDB file with transactions.
+    """
+    db = TinyDB(db_filename, sort_keys=True, indent=4, separators=(',', ': '))
+    imports_table = db.table('imports')
+
+    imports_table.remove(Query().reviewed == True)
+
+
 @cli.command()
 @click.argument("db_filename")
 @click.option("--payee", help="Limit review to transactions with the given payee")

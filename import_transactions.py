@@ -47,6 +47,8 @@ def import_transactions(csv_filename, db_filename, this_account, match_threshold
                     payees[description] = row['payee']
 
         for row in csv_reader:
+            # FIXME: check for blank/incomplete line.
+
             #print(row)
 
             if combined_debit_credit:
